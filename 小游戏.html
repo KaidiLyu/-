@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>表格减速抽奖 + 更多烟花特效 + 中心图片铺满</title>
+  <style>
+    body {
+      margin: 0; 
+      padding: 0;
+      background-color: #f5f5f5;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    h1 {
+      margin-top: 30px;
+      margin-bottom: 20px;
+    }
+    table {
+      margin: 0 auto;
+      border-collapse: collapse;
+    }
+    td {
+      width: 100px; 
+      height: 80px;
+      border: 1px solid #ccc;
+      text-align: center;
+      vertical-align: middle;
+      padding: 5px;
+      font-size: 14px;
+      background-color: #fff;
+    }
+    /* 中间合并单元格样式：去除padding，让图片能铺满 */
+    .center-cell {
+      padding: 0;
+      margin: 0;
+    }
+    /* 让图片撑满父容器并裁剪多余部分 */
+    .center-cell img {
+      display: block;
+      width: 100%;
+      height: 350%;
+      object-fit: cover;
+    }
+    /* 高亮时的样式 */
+    .highlight {
+      background-color: #ff6666 !important;
+      color: #fff;
+      font-weight: bold;
+    }
+    /* 按钮样式 */
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #f33;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #c00;
+    }
+    /* 烟花特效Canvas覆盖全屏 */
+    #fireworksCanvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none; /* 让鼠标事件穿透Canvas */
+      z-index: 9999;        /* 显示在最上层 */
+      display: none;        /* 初始隐藏，结束时再显示 */
+    }
+  </style>
+</head>
+<body>
+  <h1>男朋友犯错后的惩罚表格游戏</h1>
+
+  <!-- 5行×4列表格 -->
+  <table>
+    <tr>
+      <td id="cell1-1">请我吃好吃的</td>
+      <td id="cell1-2">给我买零食</td>
+      <td id="cell1-3">朋友圈道歉</td>
+      <td id="cell1-4">给我跳一支舞</td>
+    </tr>
+    <tr>
+      <td id="cell2-1">请我喝奶茶</td>
+      <!-- 合并中间6个单元格 -->
+      <td class="center-cell" rowspan="3" colspan="2">
+        <!-- 移除内联style，使用CSS让图片铺满 -->
+        <img src="WechatIMG48.jpg" alt="中心图片">
+      </td>
+      <td id="cell2-4">一包辣条</td>
+    </tr>
+    <tr>
+      <td id="cell3-1">再来一次</td>
+      <td id="cell3-4">跪下唱征服唱征服</td>
+    </tr>
+    <tr>
+      <td id="cell4-1">转账520</td>
+      <td id="cell4-4">给我买新衣服</td>
+    </tr>
+    <tr>
+      <td id="cell5-1">一支口红</td>
+      <td id="cell5-2">打屁屁52下</td>
+      <td id="cell5-3">带我去看电影</td>
+      <td id="cell5-4">亲亲100次</td>
+    </tr>
+  </table>
+
+  <button onclick="startGame()">开始抽奖</button>
+
+  <!-- 用于烟花特效的全屏Canvas -->
+  <canvas id="fireworksCanvas"></canvas>
+
+  <script>
+    // 外围14个格子的ID顺序
+    const perimeterOrder = [
+      "cell1-1","cell1-2","cell1-3","cell1-4",
+      "cell2-4","cell3-4","cell4-4","cell5-4",
+      "cell5-3","cell5-2","cell5-1",
+      "cell4-1","cell3-1","cell2-1"
+    ];
+
+    let currentIndex = 0;      // 当前高亮的格子索引
+    let isSpinning = false;    // 防止重复点击
+    let startTime = 0;         // 动画开始时间(毫秒)
+    let lastFrameTime = 0;     // 上一帧的时间戳
+    let highlightTimer = 0;    // 累积时间，用于判断是否该高亮下一个
+
+    // 开始抽奖
+    function startGame() {
+      if (isSpinning) return;
+      isSpinning = true;
+
+      // 随机决定起始格子，让结果更“不可预测”
+      currentIndex = Math.floor(Math.random() * perimeterOrder.length);
+
+      // 清除所有格子的高亮
+      perimeterOrder.forEach(id => {
+        document.getElementById(id).classList.remove('highlight');
+      });
+
+      // 记录开始时间，启动帧动画
+      startTime = performance.now();
+      lastFrameTime = startTime;
+      highlightTimer = 0;
+
+      requestAnimationFrame(animateHighlight);
+    }
+
+    // 动画循环：时间越接近10秒，切换高亮的间隔就越长 => 速度变慢
+    function animateHighlight(timestamp) {
+      const elapsed = timestamp - startTime;  // 已经过了多少毫秒
+      const dt = timestamp - lastFrameTime;   // 与上一帧的时间差
+      lastFrameTime = timestamp;
+
+      // 计算当前进度(0 ~ 1)
+      let fraction = elapsed / 10000; // 10秒
+      if (fraction > 1) fraction = 1;
+
+      // 高亮切换的间隔：从 50ms ~ 300ms 线性增加
+      const minInterval = 50;
+      const maxInterval = 300;
+      const highlightInterval = minInterval + (maxInterval - minInterval) * fraction;
+
+      // 累加时间，若超过当前所需的高亮间隔，就切换到下一个格子
+      highlightTimer += dt;
+      if (highlightTimer >= highlightInterval) {
+        // 移除上一个格子的高亮
+        const prevIndex = (currentIndex - 1 + perimeterOrder.length) % perimeterOrder.length;
+        document.getElementById(perimeterOrder[prevIndex]).classList.remove('highlight');
+
+        // 高亮当前格子
+        document.getElementById(perimeterOrder[currentIndex]).classList.add('highlight');
+
+        // 指向下一个
+        currentIndex = (currentIndex + 1) % perimeterOrder.length;
+        highlightTimer = 0;
+      }
+
+      // 如果时间没到10秒，继续动画
+      if (elapsed < 10000) {
+        requestAnimationFrame(animateHighlight);
+      } else {
+        // 动画结束，最终选中的格子就是最后高亮的格子
+        const finalIndex = (currentIndex - 1 + perimeterOrder.length) % perimeterOrder.length;
+        const finalCellId = perimeterOrder[finalIndex];
+        const finalText = document.getElementById(finalCellId).innerText;
+
+        alert("抽到的惩罚是：" + finalText);
+
+        // 抽奖结束
+        isSpinning = false;
+
+        // 展示烟花特效
+        showFireworks();
+      }
+    }
+
+    /****************************************************************
+     *              烟花特效示例 (Canvas动画)                      *
+     ****************************************************************/
+    let fwCanvas, fwCtx;
+    let fireworks = []; // 存放烟花粒子的数组
+    let fwStartTime = 0;
+    let fwDuration = 5000; // 烟花持续时长（毫秒）
+
+    function showFireworks() {
+      fwCanvas = document.getElementById('fireworksCanvas');
+      fwCanvas.style.display = 'block'; // 显示Canvas
+      fwCanvas.width = window.innerWidth;
+      fwCanvas.height = window.innerHeight;
+      fwCtx = fwCanvas.getContext('2d');
+
+      fwStartTime = performance.now();
+      fireworks = [];
+
+      // 生成更多烟花，这里生成10个随机烟花
+      for (let i = 0; i < 10; i++) {
+        createFirework();
+      }
+
+      requestAnimationFrame(fireworksLoop);
+    }
+
+    // 生成一组烟花粒子
+    function createFirework() {
+      // 随机在屏幕某处爆炸
+      const centerX = Math.random() * fwCanvas.width;
+      const centerY = Math.random() * fwCanvas.height * 0.6; // 稍微偏上
+
+      // 每个烟花由 30 个粒子组成
+      for (let i = 0; i < 30; i++) {
+        const angle = Math.random() * 2 * Math.PI; // 随机方向
+        const speed = Math.random() * 4 + 2;       // 粒子初速度
+        fireworks.push({
+          x: centerX,
+          y: centerY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1, // 生命值(0~1)
+          decay: Math.random() * 0.01 + 0.007, // 衰减速度
+          color: `hsl(${Math.random()*360},100%,50%)`
+        });
+      }
+    }
+
+    function fireworksLoop(timestamp) {
+      const elapsed = timestamp - fwStartTime;
+      // 如果超过持续时长，结束并隐藏Canvas
+      if (elapsed > fwDuration) {
+        fwCanvas.style.display = 'none';
+        return;
+      }
+
+      // 清屏
+      fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
+
+      // 更新并绘制所有粒子
+      fireworks.forEach((p) => {
+        // 根据速度更新位置
+        p.x += p.vx;
+        p.y += p.vy;
+        // 重力影响
+        p.vy += 0.05;
+
+        // 生命衰减
+        p.life -= p.decay;
+      });
+
+      // 过滤掉已经死亡的粒子
+      fireworks = fireworks.filter(p => p.life > 0);
+
+      // 绘制存活的粒子
+      fireworks.forEach((p) => {
+        fwCtx.globalAlpha = p.life; // 用life控制透明度
+        fwCtx.fillStyle = p.color;
+        fwCtx.beginPath();
+        fwCtx.arc(p.x, p.y, 2, 0, 2 * Math.PI);
+        fwCtx.fill();
+      });
+
+      // 动画循环
+      requestAnimationFrame(fireworksLoop);
+    }
+
+    // 窗口大小改变时，更新Canvas大小
+    window.onresize = function() {
+      if (!fwCanvas) return;
+      fwCanvas.width = window.innerWidth;
+      fwCanvas.height = window.innerHeight;
+    };
+  </script>
+</body>
+</html>
